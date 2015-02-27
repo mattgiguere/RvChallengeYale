@@ -29,14 +29,15 @@ mkRandom[ll_,n_,fiddle_]:= Module[{xx},
 
 (* The major iteration code is below *)
 
-iterPMC[chi2_, npop_, modelin_,eps_,fiddle_] :=
-    Module[ {perplex,xx,lik,pps,totpp,wt,mix,reg,dets,model},
+iterPMC[chi2_, npop_, modelin_,eps_,fiddle_,maxiter_:100] :=
+    Module[ {perplex,xx,lik,pps,totpp,wt,mix,reg,dets,model,iter},
 	(* The PMC loop starts here, execute this cell until the perplexity gets close to 1 *)
 	(* Generate npop randoms and calculate the posterior at these points*)
 	    model = modelin;
+      iter=0;
         perplex = 0;
         reg=1.0;
-        While[perplex < 0.95,
+        While[(perplex < 0.95) && (iter < maxiter),
          (* Generate random numbers *)
          xx = mkRandom[model, npop,fiddle];
          lik = chi2 @@@ xx;
@@ -63,6 +64,7 @@ iterPMC[chi2_, npop_, modelin_,eps_,fiddle_] :=
                    dx = # - mu & /@ xx;
                    dx1 = dx*wt*#;
                    sig = (Transpose[dx1].dx)/a + reg*eps;
+                   sig = (sig + Transpose[sig])/2;
                    {a, mu, sig}
                ] & /@ pps;
          dets = Det[#] & /@ mix[[All, 3]];
@@ -71,7 +73,11 @@ iterPMC[chi2_, npop_, modelin_,eps_,fiddle_] :=
              Break[]
          ];
          reg = reg/1.2;
+         mix = Select[mix,#[[1]]>10^-10 &];
          model = buildModels[mix];
+         Print["Iteration:", iter, " ",perplex," ",Mean[MixtureDistribution@@model]];
+         Print["Number of components:",Length@mix];
+         iter = iter+1;
          ];
         {perplex, xx, model}
     ]
